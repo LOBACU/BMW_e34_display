@@ -1,0 +1,107 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define SWITCH_PIN 2  // Replace with the actual pin number for your switch
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+unsigned long oldTime = 0;
+const unsigned long interval = 1000;  // Set the interval to 1000 milliseconds (1 second)
+
+// Define data types
+enum DataType {
+  TEMPERATURE,
+  RPM,
+  MAF,
+  VOLTAGE
+};
+
+DataType currentDataType = TEMPERATURE;
+
+void setup() {
+  Serial.begin(9600);
+
+  if (!display.begin(SSD1306_I2C_ADDRESS, SCREEN_WIDTH, SCREEN_HEIGHT)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for (;;);
+  }
+
+  display.display();
+  delay(2000);
+  display.clearDisplay();
+
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  pinMode(SWITCH_PIN, INPUT_PULLUP);  // Assuming the switch connects to ground when pressed
+}
+
+void loop() {
+  if ((millis() - oldTime) > interval) {
+    float dataValue = readSerialData(); // Read data from Serial
+
+    display.clearDisplay();
+
+    // Display data sign based on the current data type
+    display.setCursor(0, 0);
+    switch (currentDataType) {
+      case TEMPERATURE:
+        display.print("Temp: ");
+        break;
+      case RPM:
+        display.print("RPM: ");
+        break;
+      case MAF:
+        display.print("MAF: ");
+        break;
+      case VOLTAGE:
+        display.print("Voltage: ");
+        break;
+    }
+
+    // Display data value with symbols
+    display.setCursor(0, 16);
+    display.setTextSize(2);
+    switch (currentDataType) {
+      case TEMPERATURE:
+        display.print(dataValue);
+        display.print(" C");
+        break;
+      case RPM:
+        display.print(dataValue);
+        display.print(" RPM");
+        break;
+      case MAF:
+        display.print(dataValue);
+        display.print(" g/s");  // Assuming MAF data is in grams per second
+        break;
+      case VOLTAGE:
+        display.print(dataValue);
+        display.print(" V");
+        break;
+    }
+
+    display.display();
+
+    // Update oldTime to the current time
+    oldTime = millis();
+  }
+
+  // Other non-blocking tasks can be added here
+
+  // Check for switch input to change data type
+  if (digitalRead(SWITCH_PIN) == HIGH) {
+    delay(50);  // Debounce delay
+    currentDataType = static_cast<DataType>((currentDataType + 1) % 4);
+  }
+}
+
+float readSerialData() {
+  // Read data from Serial and parse it
+  if (Serial.available() > 0) {
+    String data = Serial.readStringUntil('\n');
+    return data.toFloat();
+  }
+  return 0.0;  // Default value if no data is available or parsing fails
+}
